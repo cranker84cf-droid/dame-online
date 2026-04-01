@@ -100,11 +100,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   aspect-ratio: 1;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  border-radius: 28px;
+  grid-template-rows: repeat(10, 1fr);
+  border-radius: 0;
   overflow: hidden;
   border: 10px solid rgba(85, 54, 34, 0.34);
+  gap: 0;
+  background: #c8b39b;
 }
-.square { display: grid; place-items: center; position: relative; }
+.square {
+  display: grid;
+  place-items: center;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+  min-height: 0;
+}
 .square.light { background: var(--board-light); }
 .square.dark { background: var(--board-dark); }
 .square.target::after {
@@ -116,8 +129,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   box-shadow: 0 0 0 7px rgba(255,255,255,0.12);
 }
 .piece {
-  width: 72%;
-  height: 72%;
+  width: 58%;
+  height: 58%;
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   border: 4px solid rgba(0,0,0,0.18);
