@@ -321,6 +321,14 @@ public sealed class RoomManager
         {
             room.Game.EndAsDraw();
             await UpdateDrawStatsAsync(room);
+            room.ReadyBySide[PlayerSide.White] = false;
+            room.ReadyBySide[PlayerSide.Black] = false;
+            room.DrawOfferBySide[PlayerSide.White] = false;
+            room.DrawOfferBySide[PlayerSide.Black] = false;
+            room.Game = CreateGame(room);
+            room.Phase = "setup";
+            room.CountdownEndsAt = null;
+            await BroadcastMessage(room, "toast", new { message = "Remis bestaetigt. Zurueck zur Vorbereitung." });
         }
 
         await BroadcastSnapshot(room);
@@ -340,6 +348,14 @@ public sealed class RoomManager
 
         room.Game.EndByResignation(session.Side);
         await UpdateStatsAfterGameAsync(room, session.Name);
+        room.ReadyBySide[PlayerSide.White] = false;
+        room.ReadyBySide[PlayerSide.Black] = false;
+        room.DrawOfferBySide[PlayerSide.White] = false;
+        room.DrawOfferBySide[PlayerSide.Black] = false;
+        room.Game = CreateGame(room);
+        room.Phase = "setup";
+        room.CountdownEndsAt = null;
+        await BroadcastMessage(room, "toast", new { message = "Aufgabe bestaetigt. Zurueck zur Vorbereitung." });
         await BroadcastSnapshot(room);
     }
 

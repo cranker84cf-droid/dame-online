@@ -345,7 +345,6 @@ public sealed class GameState
         (int dRow, int dCol)? lastDirection)
     {
         var piece = board[pieceId].Piece;
-        currentPath = currentPath.Count == 0 ? [new Position { Row = row, Col = col }] : currentPath;
         var moves = new List<LegalMove>();
         var directions = GetCaptureDirections(piece, lastDirection);
 
@@ -370,38 +369,16 @@ public sealed class GameState
                 continue;
             }
 
-            var nextBoard = CloneBoard(board);
-            nextBoard[pieceId] = (landing.Row, landing.Col, ClonePiece(piece));
-            nextBoard.Remove(captured.Piece.Id);
-
-            var nextPath = new List<Position>(currentPath)
+            moves.Add(new LegalMove
             {
-                new() { Row = landing.Row, Col = landing.Col }
-            };
-
-            var allowDirectionChange = !piece.IsKing || Rules.KingsCanChangeDirectionDuringMultiCapture;
-            (int dRow, int dCol)? nextDirection = allowDirectionChange ? null : (dRow, dCol);
-            var followUps = Rules.AllowMultiCapture && AllowFurtherCapture(piece)
-                ? GetStandardCaptures(pieceId, landing.Row, landing.Col, nextBoard, nextPath, nextDirection)
-                : [];
-
-            if (followUps.Count > 0)
-            {
-                foreach (var followUp in followUps)
-                {
-                    followUp.CapturedPieceIds.Insert(0, captured.Piece.Id);
-                    moves.Add(followUp);
-                }
-            }
-            else
-            {
-                moves.Add(new LegalMove
-                {
-                    PieceId = pieceId,
-                    Path = nextPath,
-                    CapturedPieceIds = [captured.Piece.Id]
-                });
-            }
+                PieceId = pieceId,
+                Path =
+                [
+                    new() { Row = row, Col = col },
+                    new() { Row = landing.Row, Col = landing.Col }
+                ],
+                CapturedPieceIds = [captured.Piece.Id]
+            });
         }
 
         return moves;
@@ -415,7 +392,6 @@ public sealed class GameState
         List<Position> currentPath,
         (int dRow, int dCol)? lastDirection)
     {
-        currentPath = currentPath.Count == 0 ? [new Position { Row = row, Col = col }] : currentPath;
         var piece = board[pieceId].Piece;
         var moves = new List<LegalMove>();
         var directions = GetCaptureDirections(piece, lastDirection);
@@ -433,38 +409,16 @@ public sealed class GameState
                 {
                     if (!string.IsNullOrEmpty(enemyId))
                     {
-                        var nextBoard = CloneBoard(board);
-                        nextBoard[pieceId] = (targetRow, targetCol, ClonePiece(piece));
-                        nextBoard.Remove(enemyId);
-
-                        var nextPath = new List<Position>(currentPath)
+                        moves.Add(new LegalMove
                         {
-                            new() { Row = targetRow, Col = targetCol }
-                        };
-
-                        var allowDirectionChange = Rules.KingsCanChangeDirectionDuringMultiCapture;
-                        (int dRow, int dCol)? nextDirection = allowDirectionChange ? null : (dRow, dCol);
-                        var followUps = Rules.AllowMultiCapture && Rules.KingsCanMultiCapture
-                            ? GetFlyingKingCaptures(pieceId, targetRow, targetCol, nextBoard, nextPath, nextDirection)
-                            : [];
-
-                        if (followUps.Count > 0)
-                        {
-                            foreach (var followUp in followUps)
-                            {
-                                followUp.CapturedPieceIds.Insert(0, enemyId);
-                                moves.Add(followUp);
-                            }
-                        }
-                        else
-                        {
-                            moves.Add(new LegalMove
-                            {
-                                PieceId = pieceId,
-                                Path = nextPath,
-                                CapturedPieceIds = [enemyId]
-                            });
-                        }
+                            PieceId = pieceId,
+                            Path =
+                            [
+                                new() { Row = row, Col = col },
+                                new() { Row = targetRow, Col = targetCol }
+                            ],
+                            CapturedPieceIds = [enemyId]
+                        });
                     }
 
                     step++;

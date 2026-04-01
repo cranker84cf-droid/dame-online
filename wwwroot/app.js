@@ -196,9 +196,6 @@ function renderBoard() {
       const square = document.createElement("button");
       square.type = "button";
       square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-      if (state.targets.some((pos) => pos.row === row && pos.col === col)) {
-        square.classList.add("target");
-      }
       square.addEventListener("click", () => onSquareClick(row, col));
 
       const piece = pieces.find((entry) => entry.row === row && entry.col === col);
