@@ -7,51 +7,80 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="app-shell">
-    <section class="panel hero">
+  <main class="shell">
+    <header class="topbar">
       <div>
-        <p class="eyebrow">Online Dame</p>
-        <h1>Regelbare Echtzeit-Partien fuer Handy, Tablet und PC</h1>
-        <p class="lede">Zwei Spieler treten live gegeneinander an, melden sich mit Namen an und behalten ihre Statistiken immer im Blick.</p>
+        <p class="eyebrow">Dame Online</p>
+        <h1>Live spielen auf Handy, Tablet und PC</h1>
       </div>
-      <div id="statusBanner" class="status-banner">Noch nicht verbunden.</div>
+      <div id="statusBanner" class="status-banner">Verbinde...</div>
+    </header>
+
+    <section id="screen-name" class="screen active">
+      <div class="card center-card">
+        <h2>1. Name bestaetigen</h2>
+        <p>Gib zuerst deinen Spielernamen ein. Erst danach geht es weiter zur Raumwahl.</p>
+        <label>Dein Name
+          <input id="playerName" maxlength="24" placeholder="Zum Beispiel Max">
+        </label>
+        <button id="confirmNameBtn">Namen bestaetigen</button>
+      </div>
     </section>
 
-    <section class="layout">
-      <aside class="panel sidebar">
-        <div class="block">
-          <h2>Anmeldung</h2>
-          <label>Name
-            <input id="playerName" maxlength="24" placeholder="Dein Name">
-          </label>
-          <div class="actions">
+    <section id="screen-room" class="screen">
+      <div class="card flow-card">
+        <h2>2. Raum erstellen oder betreten</h2>
+        <p>Du spielst als <strong id="confirmedNameValue">-</strong>.</p>
+        <div class="room-grid">
+          <div class="subcard">
+            <h3>Raum erstellen</h3>
+            <p>Erstelle einen Raum und teile den Code mit dem zweiten Spieler.</p>
             <button id="createRoomBtn">Raum erstellen</button>
           </div>
-          <label>Raumcode
-            <input id="roomCode" maxlength="6" placeholder="ABC123">
-          </label>
-          <button id="joinRoomBtn" class="ghost">Raum beitreten</button>
+          <div class="subcard">
+            <h3>Raum beitreten</h3>
+            <label>Raumcode
+              <input id="roomCode" maxlength="6" placeholder="ABC123">
+            </label>
+            <button id="joinRoomBtn" class="secondary">Raum beitreten</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-setup" class="screen">
+      <div class="setup-grid">
+        <div class="card">
+          <h2>3. Vorbereitung</h2>
+          <p><strong>Raum:</strong> <span id="roomCodeValue">-</span></p>
+          <p><strong>Host:</strong> <span id="hostNameValue">-</span></p>
+          <p><strong>Deine Seite:</strong> <span id="playerSideValue">-</span></p>
+          <p><strong>Status:</strong> <span id="setupStatusValue">Warte auf zweiten Spieler</span></p>
         </div>
 
-        <div class="block">
-          <h2>Lokale Farben</h2>
-          <label>Eigene Steine
+        <div class="card">
+          <h2>Farben</h2>
+          <label>Steinfarbe
             <input id="pieceColor" type="color" value="#f6f0d9">
           </label>
-          <label>Eigene Damen
+          <label>Damenfarbe
             <input id="kingColor" type="color" value="#e39a34">
           </label>
+          <button id="saveAppearanceBtn" class="secondary">Farben uebernehmen</button>
         </div>
 
-        <div class="block">
-          <h2>Raum</h2>
-          <p><strong>Code:</strong> <span id="roomCodeValue">-</span></p>
-          <p><strong>Host:</strong> <span id="hostNameValue">-</span></p>
-          <p><strong>Seite:</strong> <span id="playerSideValue">-</span></p>
-          <p><strong>Status:</strong> <span id="gameStatusValue">Warte auf Verbindung</span></p>
+        <div class="card">
+          <h2>Bereit?</h2>
+          <div class="readiness">
+            <p id="whiteReadyLabel">Weiss: wartet</p>
+            <p id="blackReadyLabel">Schwarz: wartet</p>
+          </div>
+          <button id="readyBtn">Ich bin bereit</button>
+          <button id="startMatchBtn">Spiel starten</button>
+          <p class="small">Der Host kann starten, sobald beide bereit sind.</p>
         </div>
 
-        <div class="block">
+        <div class="card rules-card">
           <h2>Regeln</h2>
           <form id="rulesForm">
             <label><input type="checkbox" name="mandatoryCapture" checked> Schlagpflicht fuer normale Steine</label>
@@ -61,8 +90,8 @@
             <label><input type="checkbox" name="kingsMoveMultipleSquares" checked> Damen fliegen beliebig weit</label>
             <label><input type="checkbox" name="kingsMustCapture" checked> Damen haben Schlagpflicht</label>
             <label><input type="checkbox" name="kingsCanMultiCapture" checked> Damen duerfen mehrfach schlagen</label>
-            <label><input type="checkbox" name="kingsCanChangeDirectionDuringMultiCapture" checked> Damen duerfen in Serien die Richtung wechseln</label>
-            <label>Sanktion bei ignorierter Schlagpflicht
+            <label><input type="checkbox" name="kingsCanChangeDirectionDuringMultiCapture" checked> Damen duerfen die Richtung wechseln</label>
+            <label>Sanktion
               <select name="missedCapturePenalty">
                 <option value="0">Keine</option>
                 <option value="1" selected>Schlagfaehigen Stein entfernen</option>
@@ -73,29 +102,36 @@
             <label>Zeitstrafe in Sekunden
               <input name="missedCaptureTimePenaltySeconds" type="number" min="1" max="120" value="10">
             </label>
-            <button id="applyRulesBtn" type="submit">Regeln uebernehmen</button>
+            <button id="applyRulesBtn" type="submit" class="secondary">Regeln speichern</button>
           </form>
         </div>
-      </aside>
+      </div>
+    </section>
 
-      <section class="panel board-panel">
-        <div class="players">
+    <section id="screen-game" class="screen">
+      <div class="game-layout">
+        <div class="player-strip">
           <article class="player-card" id="whiteCard">
             <h3>Weiss</h3>
-            <p class="player-name" id="whiteName">-</p>
+            <p id="whiteName">-</p>
             <p id="whiteTime">02:00</p>
             <p id="whiteStats">Spiele 0 | Siege 0 | Niederlagen 0 | Bestzeit -</p>
           </article>
           <article class="player-card" id="blackCard">
             <h3>Schwarz</h3>
-            <p class="player-name" id="blackName">-</p>
+            <p id="blackName">-</p>
             <p id="blackTime">02:00</p>
             <p id="blackStats">Spiele 0 | Siege 0 | Niederlagen 0 | Bestzeit -</p>
           </article>
         </div>
-        <div id="board" class="board" aria-label="Dame Brett"></div>
-        <p class="hint">Erst Stein antippen oder anklicken, dann Zielfeld. Bei Schlagzuegen immer auf das Feld hinter dem gegnerischen Stein tippen.</p>
-      </section>
+        <div class="board-wrap">
+          <div id="board" class="board"></div>
+          <div id="countdownOverlay" class="countdown-overlay hidden">
+            <p>Spiel startet gleich</p>
+            <strong id="countdownValue">5</strong>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 

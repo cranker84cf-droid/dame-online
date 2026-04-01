@@ -23,6 +23,15 @@ Danach im Browser oeffnen:
 http://localhost:5000
 ```
 
+## Render
+
+Das Repository enthaelt eine `Dockerfile` und `render.yaml`.
+In Render deshalb am einfachsten:
+
+- `New` > `Blueprint`
+- GitHub-Repository auswaehlen
+- Deploy bestaetigen
+
 ## Hinweise
 
 - Der Host erstellt einen Raumcode, der zweite Spieler tritt mit demselben Code bei.

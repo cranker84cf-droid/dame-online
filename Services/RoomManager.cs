@@ -44,6 +44,15 @@ public sealed class RoomManager
             case "updateRules":
                 await HandleUpdateRules(connectionId, message.Payload.Deserialize<UpdateRulesRequest>(_jsonOptions)!);
                 break;
+            case "setAppearance":
+                await HandleSetAppearance(connectionId, message.Payload.Deserialize<SetAppearanceRequest>(_jsonOptions)!);
+                break;
+            case "setReady":
+                await HandleSetReady(connectionId, message.Payload.Deserialize<SetReadyRequest>(_jsonOptions)!);
+                break;
+            case "startMatch":
+                await HandleStartMatch(connectionId);
+                break;
             case "ping":
                 await SendAsync(connectionId, "pong", new { ok = true });
                 break;
@@ -73,10 +82,9 @@ public sealed class RoomManager
                 return;
             }
 
-            room.Game.UpdateRules(room.Rules);
-            room.Game.SetPlayers(
-                room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.White)?.Name ?? "",
-                room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.Black)?.Name ?? "");
+            room.ReadyBySide[session.Side] = false;
+            room.Phase = room.Sessions.Count < 2 ? "room" : "setup";
+            room.Game = CreateGame(room);
             await BroadcastSnapshot(room);
             await BroadcastMessage(room, "toast", new { message = $"{session.Name} hat den Raum verlassen." });
         }
@@ -105,7 +113,18 @@ public sealed class RoomManager
             HostName = name,
             Rules = new RulesConfig(),
             Sessions = new Dictionary<string, PlayerSession>(),
-            Game = new GameState(new RulesConfig())
+            Game = new GameState(new RulesConfig()),
+            ReadyBySide = new Dictionary<PlayerSide, bool>
+            {
+                [PlayerSide.White] = false,
+                [PlayerSide.Black] = false
+            },
+            AppearanceBySide = new Dictionary<PlayerSide, PlayerAppearance>
+            {
+                [PlayerSide.White] = new PlayerAppearance { PieceColor = "#f6f0d9", KingColor = "#e39a34" },
+                [PlayerSide.Black] = new PlayerAppearance { PieceColor = "#2d2b2a", KingColor = "#8c6bff" }
+            },
+            Phase = "room"
         };
 
         room.Sessions[connectionId] = new PlayerSession
@@ -160,6 +179,7 @@ public sealed class RoomManager
         room.Game.SetPlayers(
             room.Sessions.Values.First(s => s.Side == PlayerSide.White).Name,
             name);
+        room.Phase = "setup";
 
         await SendAsync(connectionId, "roomJoined", new
         {
@@ -186,6 +206,12 @@ public sealed class RoomManager
     {
         if (!TryGetSession(connectionId, out var room, out var session))
         {
+            return;
+        }
+
+        if (room.Phase != "game")
+        {
+            await SendAsync(connectionId, "error", new { message = "Das Spiel hat noch nicht begonnen." });
             return;
         }
 
@@ -229,7 +255,81 @@ public sealed class RoomManager
 
         room.Rules = request.Rules;
         room.Game.UpdateRules(request.Rules);
+        room.ReadyBySide[PlayerSide.White] = false;
+        room.ReadyBySide[PlayerSide.Black] = false;
         await BroadcastSnapshot(room);
+    }
+
+    private async Task HandleSetAppearance(string connectionId, SetAppearanceRequest request)
+    {
+        if (!TryGetSession(connectionId, out var room, out var session))
+        {
+            return;
+        }
+
+        room.AppearanceBySide[session.Side] = new PlayerAppearance
+        {
+            PieceColor = request.PieceColor,
+            KingColor = request.KingColor
+        };
+        room.ReadyBySide[session.Side] = false;
+        await BroadcastSnapshot(room);
+    }
+
+    private async Task HandleSetReady(string connectionId, SetReadyRequest request)
+    {
+        if (!TryGetSession(connectionId, out var room, out var session))
+        {
+            return;
+        }
+
+        if (room.Phase == "countdown" || room.Phase == "game")
+        {
+            return;
+        }
+
+        room.ReadyBySide[session.Side] = request.Ready;
+        await BroadcastSnapshot(room);
+    }
+
+    private async Task HandleStartMatch(string connectionId)
+    {
+        if (!TryGetSession(connectionId, out var room, out var session))
+        {
+            return;
+        }
+
+        if (room.HostConnectionId != connectionId)
+        {
+            await SendAsync(connectionId, "error", new { message = "Nur der Host kann das Spiel starten." });
+            return;
+        }
+
+        if (room.Sessions.Count < 2)
+        {
+            await SendAsync(connectionId, "error", new { message = "Es werden zwei Spieler benoetigt." });
+            return;
+        }
+
+        if (room.ReadyBySide.Values.Any(ready => !ready))
+        {
+            await SendAsync(connectionId, "error", new { message = "Beide Spieler muessen bereit sein." });
+            return;
+        }
+
+        room.Game = CreateGame(room);
+        room.Game.SetStartingPlayer(Random.Shared.Next(2) == 0 ? PlayerSide.White : PlayerSide.Black);
+        room.Phase = "countdown";
+        room.CountdownEndsAt = DateTimeOffset.UtcNow.AddSeconds(5);
+        await BroadcastSnapshot(room);
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            room.Phase = "game";
+            room.CountdownEndsAt = null;
+            await BroadcastSnapshot(room);
+        });
     }
 
     private bool TryGetSession(string connectionId, out RoomState room, out PlayerSession session)
@@ -291,7 +391,14 @@ public sealed class RoomManager
             stats[side] = (await _playerStore.GetOrCreateAsync(playerName)).Stats;
         }
 
-        var snapshot = room.Game.ToSnapshot(room.Code, room.HostName, stats);
+        var snapshot = room.Game.ToSnapshot(
+            room.Code,
+            room.HostName,
+            room.Phase,
+            stats,
+            room.ReadyBySide,
+            room.AppearanceBySide,
+            room.CountdownEndsAt);
         await BroadcastMessage(room, "snapshot", snapshot);
     }
 
@@ -320,5 +427,14 @@ public sealed class RoomManager
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         var random = Random.Shared;
         return new string(Enumerable.Range(0, 6).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+    }
+
+    private static GameState CreateGame(RoomState room)
+    {
+        var game = new GameState(room.Rules);
+        game.SetPlayers(
+            room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.White)?.Name ?? "",
+            room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.Black)?.Name ?? "");
+        return game;
     }
 }

@@ -1,29 +1,40 @@
-const socket = new WebSocket(`ws://${location.host}/ws`);
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+const socket = new WebSocket(`${protocol}://${location.host}/ws`);
 
 const state = {
   connected: false,
+  playerName: "",
+  currentScreen: "name",
   roomCode: "",
   mySide: null,
   isHost: false,
   snapshot: null,
   selectedPieceId: null,
   targets: [],
+  ready: false,
 };
 
 const els = {
   statusBanner: document.querySelector("#statusBanner"),
   playerName: document.querySelector("#playerName"),
+  confirmNameBtn: document.querySelector("#confirmNameBtn"),
+  confirmedNameValue: document.querySelector("#confirmedNameValue"),
   roomCode: document.querySelector("#roomCode"),
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
   roomCodeValue: document.querySelector("#roomCodeValue"),
   hostNameValue: document.querySelector("#hostNameValue"),
   playerSideValue: document.querySelector("#playerSideValue"),
-  gameStatusValue: document.querySelector("#gameStatusValue"),
-  board: document.querySelector("#board"),
-  rulesForm: document.querySelector("#rulesForm"),
+  setupStatusValue: document.querySelector("#setupStatusValue"),
   pieceColor: document.querySelector("#pieceColor"),
   kingColor: document.querySelector("#kingColor"),
+  saveAppearanceBtn: document.querySelector("#saveAppearanceBtn"),
+  readyBtn: document.querySelector("#readyBtn"),
+  startMatchBtn: document.querySelector("#startMatchBtn"),
+  whiteReadyLabel: document.querySelector("#whiteReadyLabel"),
+  blackReadyLabel: document.querySelector("#blackReadyLabel"),
+  rulesForm: document.querySelector("#rulesForm"),
+  board: document.querySelector("#board"),
   whiteName: document.querySelector("#whiteName"),
   blackName: document.querySelector("#blackName"),
   whiteTime: document.querySelector("#whiteTime"),
@@ -32,15 +43,27 @@ const els = {
   blackStats: document.querySelector("#blackStats"),
   whiteCard: document.querySelector("#whiteCard"),
   blackCard: document.querySelector("#blackCard"),
+  countdownOverlay: document.querySelector("#countdownOverlay"),
+  countdownValue: document.querySelector("#countdownValue"),
+  screens: {
+    name: document.querySelector("#screen-name"),
+    room: document.querySelector("#screen-room"),
+    setup: document.querySelector("#screen-setup"),
+    game: document.querySelector("#screen-game"),
+  }
 };
 
-function send(type, payload) {
+function send(type, payload = {}) {
+  if (socket.readyState !== WebSocket.OPEN) {
+    setBanner("Die Verbindung ist noch nicht bereit.");
+    return;
+  }
   socket.send(JSON.stringify({ type, payload }));
 }
 
 socket.addEventListener("open", () => {
   state.connected = true;
-  setBanner("Verbunden. Raum erstellen oder beitreten.");
+  setBanner("Verbunden. Bitte erst den Namen bestaetigen.");
 });
 
 socket.addEventListener("close", () => {
@@ -48,32 +71,51 @@ socket.addEventListener("close", () => {
   setBanner("Verbindung getrennt.");
 });
 
-socket.addEventListener("message", (event) => {
-  const { type, payload } = JSON.parse(event.data);
+socket.addEventListener("message", ({ data }) => {
+  const { type, payload } = JSON.parse(data);
   if (type === "roomJoined") {
     state.roomCode = payload.roomCode;
     state.mySide = payload.side;
     state.isHost = payload.isHost;
-    renderRoomMeta();
+    showScreen("setup");
   } else if (type === "snapshot") {
     state.snapshot = payload;
     state.selectedPieceId = payload.selectedPieceId;
     state.targets = payload.forcedDestinations || [];
+    state.ready = readDict(payload.readyStates, normalizeSide(state.mySide)) ?? false;
+    const phase = payload.phase;
+    showScreen(phase === "game" || phase === "countdown" ? "game" : state.roomCode ? "setup" : state.currentScreen);
     renderAll();
-  } else if (type === "error") {
-    setBanner(payload.message);
-  } else if (type === "toast") {
+  } else if (type === "error" || type === "toast") {
     setBanner(payload.message);
   }
 });
 
-els.createRoomBtn.addEventListener("click", () => {
-  send("createRoom", { name: els.playerName.value.trim() });
+els.confirmNameBtn.addEventListener("click", () => {
+  const name = els.playerName.value.trim();
+  if (!name) {
+    setBanner("Bitte gib zuerst deinen Namen ein.");
+    return;
+  }
+  state.playerName = name;
+  els.confirmedNameValue.textContent = name;
+  showScreen("room");
+  setBanner(`Willkommen ${name}. Jetzt kannst du einen Raum erstellen oder betreten.`);
 });
 
-els.joinRoomBtn.addEventListener("click", () => {
-  send("joinRoom", { name: els.playerName.value.trim(), roomCode: els.roomCode.value.trim().toUpperCase() });
+els.createRoomBtn.addEventListener("click", () => send("createRoom", { name: state.playerName }));
+els.joinRoomBtn.addEventListener("click", () => send("joinRoom", { name: state.playerName, roomCode: els.roomCode.value.trim().toUpperCase() }));
+
+els.saveAppearanceBtn.addEventListener("click", () => {
+  send("setAppearance", {
+    pieceColor: els.pieceColor.value,
+    kingColor: els.kingColor.value
+  });
+  send("setReady", { ready: false });
 });
+
+els.readyBtn.addEventListener("click", () => send("setReady", { ready: !state.ready }));
+els.startMatchBtn.addEventListener("click", () => send("startMatch", {}));
 
 els.rulesForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -81,7 +123,6 @@ els.rulesForm.addEventListener("submit", (event) => {
     setBanner("Nur der Host darf die Regeln aendern.");
     return;
   }
-
   const form = new FormData(els.rulesForm);
   send("updateRules", {
     rules: {
@@ -99,78 +140,120 @@ els.rulesForm.addEventListener("submit", (event) => {
   });
 });
 
-els.pieceColor.addEventListener("input", applyLocalColors);
-els.kingColor.addEventListener("input", applyLocalColors);
-
-function renderAll() {
-  renderRoomMeta();
-  renderCards();
-  renderBoard();
-  syncRulesForm();
+function showScreen(name) {
+  state.currentScreen = name;
+  for (const [key, element] of Object.entries(els.screens)) {
+    element.classList.toggle("active", key === name);
+  }
 }
 
-function renderRoomMeta() {
-  els.roomCodeValue.textContent = state.roomCode || "-";
-  els.hostNameValue.textContent = state.snapshot?.hostName || "-";
-  els.playerSideValue.textContent = state.mySide || "-";
-  els.gameStatusValue.textContent = state.snapshot?.statusMessage || "Warte auf Verbindung";
-  setBanner(state.snapshot?.statusMessage || "Bereit.");
+function renderAll() {
+  renderMeta();
+  renderReady();
+  syncRulesForm();
+  renderCards();
+  renderBoard();
+  renderCountdown();
+}
+
+function renderMeta() {
+  const snap = state.snapshot;
+  if (!snap) return;
+  els.roomCodeValue.textContent = snap.roomCode;
+  els.hostNameValue.textContent = snap.hostName;
+  els.playerSideValue.textContent = humanSide(state.mySide);
+  els.setupStatusValue.textContent = snap.statusMessage;
+  setBanner(snap.statusMessage);
+  const myAppearance = readDict(snap.appearanceBySide, normalizeSide(state.mySide));
+  if (myAppearance) {
+    els.pieceColor.value = myAppearance.pieceColor;
+    els.kingColor.value = myAppearance.kingColor;
+  }
+}
+
+function renderReady() {
+  const snap = state.snapshot;
+  if (!snap) return;
+  const whiteReady = readDict(snap.readyStates, "white");
+  const blackReady = readDict(snap.readyStates, "black");
+  els.whiteReadyLabel.textContent = `Weiss: ${whiteReady ? "bereit" : "wartet"}`;
+  els.blackReadyLabel.textContent = `Schwarz: ${blackReady ? "bereit" : "wartet"}`;
+  els.readyBtn.textContent = state.ready ? "Bereitschaft aufheben" : "Ich bin bereit";
+  els.startMatchBtn.disabled = !state.isHost || !whiteReady || !blackReady;
 }
 
 function renderCards() {
   const snap = state.snapshot;
   if (!snap) return;
-  const whiteStats = snap.stats.White || snap.stats.white;
-  const blackStats = snap.stats.Black || snap.stats.black;
-  els.whiteName.textContent = snap.players.White || snap.players.white || "-";
-  els.blackName.textContent = snap.players.Black || snap.players.black || "-";
-  els.whiteTime.textContent = fmtTime(snap.remainingTurnMs.White ?? snap.remainingTurnMs.white);
-  els.blackTime.textContent = fmtTime(snap.remainingTurnMs.Black ?? snap.remainingTurnMs.black);
+  const whiteStats = readDict(snap.stats, "white") || {};
+  const blackStats = readDict(snap.stats, "black") || {};
+  els.whiteName.textContent = readDict(snap.players, "white") || "-";
+  els.blackName.textContent = readDict(snap.players, "black") || "-";
+  els.whiteTime.textContent = fmtTime(readDict(snap.remainingTurnMs, "white"));
+  els.blackTime.textContent = fmtTime(readDict(snap.remainingTurnMs, "black"));
   els.whiteStats.textContent = fmtStats(whiteStats);
   els.blackStats.textContent = fmtStats(blackStats);
-  const turn = snap.currentTurn;
-  els.whiteCard.classList.toggle("active", turn === "White" || turn === 0);
-  els.blackCard.classList.toggle("active", turn === "Black" || turn === 1);
+  const turn = normalizeSide(snap.currentTurn);
+  els.whiteCard.classList.toggle("active", turn === "white");
+  els.blackCard.classList.toggle("active", turn === "black");
 }
 
 function renderBoard() {
   els.board.innerHTML = "";
   const snap = state.snapshot;
   const pieces = snap?.pieces ? Object.values(snap.pieces) : [];
+  const appearance = snap?.appearanceBySide || {};
+  const whiteAppearance = readDict(appearance, "white");
+  const blackAppearance = readDict(appearance, "black");
 
   for (let row = 0; row < 10; row++) {
     for (let col = 0; col < 10; col++) {
       const square = document.createElement("button");
-      square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
       square.type = "button";
-      const target = state.targets.some((pos) => pos.row === row && pos.col === col);
-      if (target) square.classList.add("target");
+      square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+      if (state.targets.some((pos) => pos.row === row && pos.col === col)) {
+        square.classList.add("target");
+      }
       square.addEventListener("click", () => onSquareClick(row, col));
 
-      const piece = pieces.find((item) => item.row === row && item.col === col);
+      const piece = pieces.find((entry) => entry.row === row && entry.col === col);
       if (piece) {
         const el = document.createElement("div");
-        const isMine = normalizeSide(piece.side) === normalizeSide(state.mySide);
-        el.className = `piece ${normalizeSide(piece.side)} ${piece.isKing ? "king" : ""}`;
+        const side = normalizeSide(piece.side);
+        const colors = side === "white" ? whiteAppearance : blackAppearance;
+        el.className = `piece ${side} ${piece.isKing ? "king" : ""}`;
+        el.style.background = piece.isKing ? colors?.kingColor ?? "#d4a638" : colors?.pieceColor ?? "#f6f0d9";
         if (piece.id === state.selectedPieceId) el.classList.add("selected");
         el.dataset.symbol = piece.isKing ? "D" : "";
         el.addEventListener("click", (event) => {
           event.stopPropagation();
-          if (isMine) {
+          if (side === normalizeSide(state.mySide) && state.snapshot?.phase === "game") {
             send("selectPiece", { pieceId: piece.id });
           }
         });
         square.appendChild(el);
       }
-
       els.board.appendChild(square);
     }
   }
 }
 
+function renderCountdown() {
+  const snap = state.snapshot;
+  const countdownEnds = snap?.countdownEndsAtUnixMs;
+  if (snap?.phase !== "countdown" || !countdownEnds) {
+    els.countdownOverlay.classList.add("hidden");
+    return;
+  }
+
+  const seconds = Math.max(0, Math.ceil((countdownEnds - Date.now()) / 1000));
+  els.countdownValue.textContent = seconds;
+  els.countdownOverlay.classList.remove("hidden");
+}
+
 function onSquareClick(row, col) {
-  if (!state.selectedPieceId) return;
-  const from = findSelectedPiece();
+  if (state.snapshot?.phase !== "game" || !state.selectedPieceId) return;
+  const from = Object.values(state.snapshot.pieces || {}).find((piece) => piece.id === state.selectedPieceId);
   if (!from) return;
   send("move", {
     pieceId: state.selectedPieceId,
@@ -181,14 +264,9 @@ function onSquareClick(row, col) {
   });
 }
 
-function findSelectedPiece() {
-  const pieces = Object.values(state.snapshot?.pieces || {});
-  return pieces.find((piece) => piece.id === state.selectedPieceId);
-}
-
 function syncRulesForm() {
-  if (!state.snapshot?.rules) return;
-  const rules = state.snapshot.rules;
+  const rules = state.snapshot?.rules;
+  if (!rules) return;
   const map = {
     mandatoryCapture: rules.mandatoryCapture,
     allowMultiCapture: rules.allowMultiCapture,
@@ -204,38 +282,45 @@ function syncRulesForm() {
   }
   els.rulesForm.elements.missedCapturePenalty.value = String(rules.missedCapturePenalty);
   els.rulesForm.elements.missedCaptureTimePenaltySeconds.value = String(rules.missedCaptureTimePenaltySeconds);
-  Array.from(els.rulesForm.elements).forEach((el) => {
-    if ("disabled" in el) el.disabled = !state.isHost;
+  Array.from(els.rulesForm.elements).forEach((element) => {
+    if ("disabled" in element) {
+      element.disabled = !state.isHost;
+    }
   });
 }
 
-function fmtTime(ms = 0) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
-function fmtStats(stats = {}) {
-  const best = stats.bestMoveTimeMs ? `${(stats.bestMoveTimeMs / 1000).toFixed(2)}s` : "-";
-  return `Spiele ${stats.totalGames || 0} | Siege ${stats.wins || 0} | Niederlagen ${stats.losses || 0} | Bestzeit ${best}`;
+function readDict(obj, side) {
+  if (!obj) return null;
+  if (side === "white") return obj.White ?? obj.white ?? null;
+  return obj.Black ?? obj.black ?? null;
 }
 
 function normalizeSide(side) {
-  if (side === 0 || side === "White") return "white";
+  if (side === 0 || side === "White" || side === "white") return "white";
   return "black";
 }
 
-function applyLocalColors() {
-  document.documentElement.style.setProperty("--my-piece", els.pieceColor.value);
-  document.documentElement.style.setProperty("--my-king", els.kingColor.value);
+function humanSide(side) {
+  return normalizeSide(side) === "white" ? "Weiss" : "Schwarz";
+}
+
+function fmtTime(ms = 0) {
+  const total = Math.max(0, Math.floor((ms ?? 0) / 1000));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function fmtStats(stats) {
+  const best = stats.bestMoveTimeMs ? `${(stats.bestMoveTimeMs / 1000).toFixed(2)}s` : "-";
+  return `Spiele ${stats.totalGames || 0} | Siege ${stats.wins || 0} | Niederlagen ${stats.losses || 0} | Bestzeit ${best}`;
 }
 
 function setBanner(text) {
   els.statusBanner.textContent = text;
 }
 
-applyLocalColors();
 setInterval(() => {
-  if (state.snapshot) renderCards();
-}, 300);
+  if (state.snapshot) {
+    renderCards();
+    renderCountdown();
+  }
+}, 250);

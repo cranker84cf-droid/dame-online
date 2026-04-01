@@ -8,4 +8,8 @@ public sealed class RoomState
     public required RulesConfig Rules { get; set; }
     public required Dictionary<string, PlayerSession> Sessions { get; init; }
     public required GameState Game { get; set; }
+    public required Dictionary<PlayerSide, bool> ReadyBySide { get; init; }
+    public required Dictionary<PlayerSide, PlayerAppearance> AppearanceBySide { get; init; }
+    public required string Phase { get; set; }
+    public DateTimeOffset? CountdownEndsAt { get; set; }
 }

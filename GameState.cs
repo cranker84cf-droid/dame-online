@@ -42,6 +42,13 @@ public sealed class GameState
         _turnStartedAt = DateTimeOffset.UtcNow;
     }
 
+    public void SetStartingPlayer(PlayerSide side)
+    {
+        CurrentTurn = side;
+        StatusMessage = $"Am Zug: {Players[CurrentTurn]}";
+        _turnStartedAt = DateTimeOffset.UtcNow;
+    }
+
     public void UpdateRules(RulesConfig rules)
     {
         Rules = CloneRules(rules);
@@ -151,7 +158,14 @@ public sealed class GameState
         return new MoveResult { Success = true, Message = StatusMessage };
     }
 
-    public GameSnapshot ToSnapshot(string roomCode, string hostName, Dictionary<PlayerSide, PlayerStats> stats)
+    public GameSnapshot ToSnapshot(
+        string roomCode,
+        string hostName,
+        string phase,
+        Dictionary<PlayerSide, PlayerStats> stats,
+        Dictionary<PlayerSide, bool> readyStates,
+        Dictionary<PlayerSide, PlayerAppearance> appearanceBySide,
+        DateTimeOffset? countdownEndsAt)
     {
         var remaining = new Dictionary<PlayerSide, long>(_remainingTurnMs)
         {
@@ -162,6 +176,7 @@ public sealed class GameState
         {
             RoomCode = roomCode,
             HostName = hostName,
+            Phase = phase,
             Rules = CloneRules(Rules),
             Pieces = _pieces.Values.ToDictionary(
                 v => v.Piece.Id,
@@ -177,6 +192,15 @@ public sealed class GameState
             Players = new Dictionary<PlayerSide, string>(Players),
             RemainingTurnMs = remaining,
             Stats = stats,
+            ReadyStates = new Dictionary<PlayerSide, bool>(readyStates),
+            AppearanceBySide = appearanceBySide.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new PlayerAppearance
+                {
+                    PieceColor = kvp.Value.PieceColor,
+                    KingColor = kvp.Value.KingColor
+                }),
+            CountdownEndsAtUnixMs = countdownEndsAt?.ToUnixTimeMilliseconds(),
             IsGameOver = IsGameOver,
             StatusMessage = StatusMessage,
             SelectedPieceId = SelectedPieceId,
