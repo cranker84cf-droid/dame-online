@@ -1,0 +1,150 @@
+:root {
+  --bg: #ebe3d4;
+  --panel: rgba(255, 252, 245, 0.92);
+  --ink: #1c1b18;
+  --accent: #b44c2f;
+  --accent-2: #244c63;
+  --board-dark: #6a4228;
+  --board-light: #e7d3b1;
+  --line: rgba(28, 27, 24, 0.12);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(180, 76, 47, 0.25), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(36, 76, 99, 0.22), transparent 35%),
+    linear-gradient(135deg, #f5efe3, #ddd2c3);
+}
+
+.app-shell { padding: 20px; max-width: 1500px; margin: 0 auto; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: 0 24px 70px rgba(57, 34, 22, 0.12);
+}
+.hero {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+.eyebrow { text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); font-size: 0.78rem; }
+h1, h2, h3, p { margin-top: 0; }
+.lede { max-width: 55ch; }
+.status-banner {
+  min-width: 260px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(180, 76, 47, 0.12), rgba(36, 76, 99, 0.12));
+  font-weight: 700;
+}
+.layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+.sidebar { padding: 18px; display: grid; gap: 16px; align-content: start; }
+.block {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255,255,255,0.45);
+}
+label { display: grid; gap: 6px; margin-bottom: 10px; font-size: 0.95rem; }
+input, select, button {
+  font: inherit;
+  border-radius: 12px;
+  border: 1px solid rgba(28, 27, 24, 0.18);
+  padding: 10px 12px;
+}
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+button:hover { transform: translateY(-1px); }
+button.ghost { background: var(--accent-2); }
+.actions { display: flex; gap: 10px; margin: 12px 0; }
+.board-panel { padding: 20px; }
+.players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.player-card {
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.35));
+}
+.player-card.active {
+  outline: 3px solid rgba(180, 76, 47, 0.35);
+}
+.board {
+  width: min(92vw, 860px);
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  border-radius: 26px;
+  overflow: hidden;
+  margin: 0 auto;
+  border: 10px solid rgba(85, 54, 34, 0.35);
+}
+.square {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.square.light { background: var(--board-light); }
+.square.dark { background: var(--board-dark); }
+.square.target::after {
+  content: "";
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: rgba(94, 188, 108, 0.9);
+  box-shadow: 0 0 0 8px rgba(255,255,255,0.16);
+}
+.piece {
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  border: 4px solid rgba(0,0,0,0.18);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  user-select: none;
+  touch-action: manipulation;
+  box-shadow: inset 0 10px 18px rgba(255,255,255,0.28), 0 8px 14px rgba(0,0,0,0.18);
+}
+.piece.black { background: #2d2b2a; color: #f8f5ef; }
+.piece.white { background: var(--my-piece, #f6f0d9); color: #2d2b2a; }
+.piece.king.white { background: var(--my-king, #e39a34); }
+.piece.selected {
+  outline: 4px solid rgba(94, 188, 108, 0.85);
+  transform: scale(1.04);
+}
+.piece::after {
+  content: attr(data-symbol);
+  font-size: clamp(0.8rem, 1.5vw, 1.3rem);
+}
+.hint { margin: 14px auto 0; max-width: 60ch; text-align: center; }
+
+@media (max-width: 1020px) {
+  .layout { grid-template-columns: 1fr; }
+  .board { width: min(94vw, 720px); }
+}
+
+@media (max-width: 720px) {
+  .hero { flex-direction: column; align-items: flex-start; }
+  .players { grid-template-columns: 1fr; }
+  .board { border-width: 6px; border-radius: 18px; }
+}

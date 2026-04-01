@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dame Online</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="panel hero">
+      <div>
+        <p class="eyebrow">Online Dame</p>
+        <h1>Regelbare Echtzeit-Partien fuer Handy, Tablet und PC</h1>
+        <p class="lede">Zwei Spieler treten live gegeneinander an, melden sich mit Namen an und behalten ihre Statistiken immer im Blick.</p>
+      </div>
+      <div id="statusBanner" class="status-banner">Noch nicht verbunden.</div>
+    </section>
+
+    <section class="layout">
+      <aside class="panel sidebar">
+        <div class="block">
+          <h2>Anmeldung</h2>
+          <label>Name
+            <input id="playerName" maxlength="24" placeholder="Dein Name">
+          </label>
+          <div class="actions">
+            <button id="createRoomBtn">Raum erstellen</button>
+          </div>
+          <label>Raumcode
+            <input id="roomCode" maxlength="6" placeholder="ABC123">
+          </label>
+          <button id="joinRoomBtn" class="ghost">Raum beitreten</button>
+        </div>
+
+        <div class="block">
+          <h2>Lokale Farben</h2>
+          <label>Eigene Steine
+            <input id="pieceColor" type="color" value="#f6f0d9">
+          </label>
+          <label>Eigene Damen
+            <input id="kingColor" type="color" value="#e39a34">
+          </label>
+        </div>
+
+        <div class="block">
+          <h2>Raum</h2>
+          <p><strong>Code:</strong> <span id="roomCodeValue">-</span></p>
+          <p><strong>Host:</strong> <span id="hostNameValue">-</span></p>
+          <p><strong>Seite:</strong> <span id="playerSideValue">-</span></p>
+          <p><strong>Status:</strong> <span id="gameStatusValue">Warte auf Verbindung</span></p>
+        </div>
+
+        <div class="block">
+          <h2>Regeln</h2>
+          <form id="rulesForm">
+            <label><input type="checkbox" name="mandatoryCapture" checked> Schlagpflicht fuer normale Steine</label>
+            <label><input type="checkbox" name="allowMultiCapture" checked> Mehrfachschlag erlaubt</label>
+            <label><input type="checkbox" name="requireMultiCapture" checked> Mehrfachschlag Pflicht</label>
+            <label><input type="checkbox" name="menCanCaptureBackward"> Normale Steine duerfen rueckwaerts schlagen</label>
+            <label><input type="checkbox" name="kingsMoveMultipleSquares" checked> Damen fliegen beliebig weit</label>
+            <label><input type="checkbox" name="kingsMustCapture" checked> Damen haben Schlagpflicht</label>
+            <label><input type="checkbox" name="kingsCanMultiCapture" checked> Damen duerfen mehrfach schlagen</label>
+            <label><input type="checkbox" name="kingsCanChangeDirectionDuringMultiCapture" checked> Damen duerfen in Serien die Richtung wechseln</label>
+            <label>Sanktion bei ignorierter Schlagpflicht
+              <select name="missedCapturePenalty">
+                <option value="0">Keine</option>
+                <option value="1" selected>Schlagfaehigen Stein entfernen</option>
+                <option value="2">Zeitstrafe</option>
+                <option value="3">Gegnerischen Stein zurueckgeben</option>
+              </select>
+            </label>
+            <label>Zeitstrafe in Sekunden
+              <input name="missedCaptureTimePenaltySeconds" type="number" min="1" max="120" value="10">
+            </label>
+            <button id="applyRulesBtn" type="submit">Regeln uebernehmen</button>
+          </form>
+        </div>
+      </aside>
+
+      <section class="panel board-panel">
+        <div class="players">
+          <article class="player-card" id="whiteCard">
+            <h3>Weiss</h3>
+            <p class="player-name" id="whiteName">-</p>
+            <p id="whiteTime">02:00</p>
+            <p id="whiteStats">Spiele 0 | Siege 0 | Niederlagen 0 | Bestzeit -</p>
+          </article>
+          <article class="player-card" id="blackCard">
+            <h3>Schwarz</h3>
+            <p class="player-name" id="blackName">-</p>
+            <p id="blackTime">02:00</p>
+            <p id="blackStats">Spiele 0 | Siege 0 | Niederlagen 0 | Bestzeit -</p>
+          </article>
+        </div>
+        <div id="board" class="board" aria-label="Dame Brett"></div>
+        <p class="hint">Erst Stein antippen oder anklicken, dann Zielfeld. Bei Schlagzuegen immer auf das Feld hinter dem gegnerischen Stein tippen.</p>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
