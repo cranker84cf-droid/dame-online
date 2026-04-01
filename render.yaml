@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: dame-online
+    env: docker
+    plan: free
+    autoDeploy: true
