@@ -335,7 +335,7 @@ public sealed class GameState
             };
 
             var allowDirectionChange = !piece.IsKing || Rules.KingsCanChangeDirectionDuringMultiCapture;
-            var nextDirection = allowDirectionChange ? null : (dRow, dCol);
+            (int dRow, int dCol)? nextDirection = allowDirectionChange ? null : (dRow, dCol);
             var followUps = Rules.AllowMultiCapture && AllowFurtherCapture(piece)
                 ? GetStandardCaptures(pieceId, landing.Row, landing.Col, nextBoard, nextPath, nextDirection)
                 : [];
@@ -398,7 +398,7 @@ public sealed class GameState
                         };
 
                         var allowDirectionChange = Rules.KingsCanChangeDirectionDuringMultiCapture;
-                        var nextDirection = allowDirectionChange ? null : (dRow, dCol);
+                        (int dRow, int dCol)? nextDirection = allowDirectionChange ? null : (dRow, dCol);
                         var followUps = Rules.AllowMultiCapture && Rules.KingsCanMultiCapture
                             ? GetFlyingKingCaptures(pieceId, targetRow, targetCol, nextBoard, nextPath, nextDirection)
                             : [];
