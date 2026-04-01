@@ -49,6 +49,19 @@ public sealed class GameState
         _turnStartedAt = DateTimeOffset.UtcNow;
     }
 
+    public void EndByResignation(PlayerSide loser)
+    {
+        var winner = loser == PlayerSide.White ? PlayerSide.Black : PlayerSide.White;
+        DeclareWinner(winner, $"{Players[loser]} gibt auf. {Players[winner]} gewinnt.");
+    }
+
+    public void EndAsDraw()
+    {
+        IsGameOver = true;
+        SelectedPieceId = null;
+        StatusMessage = "Remis nach Zustimmung beider Spieler.";
+    }
+
     public void UpdateRules(RulesConfig rules)
     {
         Rules = CloneRules(rules);
@@ -170,6 +183,7 @@ public sealed class GameState
         string phase,
         Dictionary<PlayerSide, PlayerStats> stats,
         Dictionary<PlayerSide, bool> readyStates,
+        Dictionary<PlayerSide, bool> drawOffers,
         Dictionary<PlayerSide, PlayerAppearance> appearanceBySide,
         DateTimeOffset? countdownEndsAt)
     {
@@ -199,6 +213,7 @@ public sealed class GameState
             RemainingTurnMs = remaining,
             Stats = stats,
             ReadyStates = new Dictionary<PlayerSide, bool>(readyStates),
+            DrawOffers = new Dictionary<PlayerSide, bool>(drawOffers),
             AppearanceBySide = appearanceBySide.ToDictionary(
                 kvp => kvp.Key,
                 kvp => new PlayerAppearance

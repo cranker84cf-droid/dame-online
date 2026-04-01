@@ -20,8 +20,10 @@ body {
     radial-gradient(circle at top left, rgba(166, 63, 31, 0.22), transparent 28%),
     radial-gradient(circle at top right, rgba(39, 73, 95, 0.18), transparent 30%),
     linear-gradient(145deg, var(--bg-1), var(--bg-2));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
+body.game-mode { overflow: hidden; }
 
 .shell { max-width: 1400px; margin: 0 auto; padding: 16px; min-height: 100dvh; }
 .topbar, .card, .player-card {
@@ -82,15 +84,17 @@ button.secondary { background: var(--accent-soft); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 .readiness { margin-bottom: 12px; }
 .small { font-size: 0.92rem; opacity: 0.78; }
-.game-layout { display: grid; gap: 20px; }
-.player-strip {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.game-layout { display: grid; gap: 12px; justify-items: center; }
+.game-toolbar {
+  width: min(92vw, calc(100dvh - 210px), 880px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
 }
-.player-card { padding: 16px 18px; }
-.player-card.active { outline: 3px solid rgba(166, 63, 31, 0.35); }
-.board-wrap { position: relative; width: min(92vw, calc(100dvh - 210px), 880px); margin: 0 auto; }
+.game-actions { display: flex; gap: 10px; }
+.board-wrap { position: relative; width: min(92vw, calc(100dvh - 250px), 880px); margin: 0 auto; }
 .board {
   width: 100%;
   aspect-ratio: 1;
@@ -137,10 +141,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .countdown-overlay strong { font-size: clamp(4rem, 14vw, 7rem); line-height: 1; }
 .hidden { display: none; }
-.open-rooms-list {
-  display: grid;
-  gap: 10px;
-}
+.open-rooms-list { display: grid; gap: 10px; }
 .room-list-card { margin-top: 18px; }
 .room-entry {
   display: grid;
@@ -152,10 +153,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 @media (max-width: 900px) {
-  body { overflow: auto; }
-  .topbar, .room-grid, .setup-grid, .player-strip { grid-template-columns: 1fr; display: grid; }
+  body.game-mode { overflow-y: auto; }
+  .topbar, .room-grid, .setup-grid { grid-template-columns: 1fr; display: grid; }
   .topbar { align-items: start; }
   .shell { min-height: auto; }
-  .board-wrap { width: min(96vw, calc(100dvh - 260px)); }
+  .game-toolbar {
+    width: min(96vw, 680px);
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .game-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .board-wrap { width: min(96vw, calc(100dvh - 320px)); }
   .card { padding: 18px; }
 }

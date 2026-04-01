@@ -53,6 +53,12 @@ public sealed class RoomManager
             case "startMatch":
                 await HandleStartMatch(connectionId);
                 break;
+            case "setDrawOffer":
+                await HandleSetDrawOffer(connectionId, message.Payload.Deserialize<SetDrawOfferRequest>(_jsonOptions)!);
+                break;
+            case "resign":
+                await HandleResign(connectionId);
+                break;
             case "ping":
                 await SendAsync(connectionId, "pong", new { ok = true });
                 break;
@@ -115,6 +121,11 @@ public sealed class RoomManager
             Sessions = new Dictionary<string, PlayerSession>(),
             Game = new GameState(new RulesConfig()),
             ReadyBySide = new Dictionary<PlayerSide, bool>
+            {
+                [PlayerSide.White] = false,
+                [PlayerSide.Black] = false
+            },
+            DrawOfferBySide = new Dictionary<PlayerSide, bool>
             {
                 [PlayerSide.White] = false,
                 [PlayerSide.Black] = false
@@ -292,6 +303,46 @@ public sealed class RoomManager
         await BroadcastSnapshot(room);
     }
 
+    private async Task HandleSetDrawOffer(string connectionId, SetDrawOfferRequest request)
+    {
+        if (!TryGetSession(connectionId, out var room, out var session))
+        {
+            return;
+        }
+
+        if (room.Phase != "game")
+        {
+            return;
+        }
+
+        room.DrawOfferBySide[session.Side] = request.Offered;
+        var opponent = session.Side == PlayerSide.White ? PlayerSide.Black : PlayerSide.White;
+        if (request.Offered && room.DrawOfferBySide[opponent])
+        {
+            room.Game.EndAsDraw();
+            await UpdateDrawStatsAsync(room);
+        }
+
+        await BroadcastSnapshot(room);
+    }
+
+    private async Task HandleResign(string connectionId)
+    {
+        if (!TryGetSession(connectionId, out var room, out var session))
+        {
+            return;
+        }
+
+        if (room.Phase != "game")
+        {
+            return;
+        }
+
+        room.Game.EndByResignation(session.Side);
+        await UpdateStatsAfterGameAsync(room, session.Name);
+        await BroadcastSnapshot(room);
+    }
+
     private async Task HandleStartMatch(string connectionId)
     {
         if (!TryGetSession(connectionId, out var room, out var session))
@@ -319,6 +370,8 @@ public sealed class RoomManager
 
         room.Game = CreateGame(room);
         room.Game.SetStartingPlayer(Random.Shared.Next(2) == 0 ? PlayerSide.White : PlayerSide.Black);
+        room.DrawOfferBySide[PlayerSide.White] = false;
+        room.DrawOfferBySide[PlayerSide.Black] = false;
         room.Phase = "countdown";
         room.CountdownEndsAt = DateTimeOffset.UtcNow.AddSeconds(5);
         await BroadcastSnapshot(room);
@@ -376,6 +429,20 @@ public sealed class RoomManager
         }
     }
 
+    private async Task UpdateDrawStatsAsync(RoomState room)
+    {
+        foreach (var side in new[] { PlayerSide.White, PlayerSide.Black })
+        {
+            var name = room.Game.Players[side];
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            await _playerStore.UpdateAsync(name, stats => { stats.TotalGames++; });
+        }
+    }
+
     private async Task BroadcastSnapshot(RoomState room)
     {
         var stats = new Dictionary<PlayerSide, PlayerStats>();
@@ -397,6 +464,7 @@ public sealed class RoomManager
             room.Phase,
             stats,
             room.ReadyBySide,
+            room.DrawOfferBySide,
             room.AppearanceBySide,
             room.CountdownEndsAt);
         await BroadcastMessage(room, "snapshot", snapshot);

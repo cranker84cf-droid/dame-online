@@ -34,14 +34,9 @@ const els = {
   blackReadyLabel: document.querySelector("#blackReadyLabel"),
   rulesForm: document.querySelector("#rulesForm"),
   board: document.querySelector("#board"),
-  whiteName: document.querySelector("#whiteName"),
-  blackName: document.querySelector("#blackName"),
-  whiteTime: document.querySelector("#whiteTime"),
-  blackTime: document.querySelector("#blackTime"),
-  whiteStats: document.querySelector("#whiteStats"),
-  blackStats: document.querySelector("#blackStats"),
-  whiteCard: document.querySelector("#whiteCard"),
-  blackCard: document.querySelector("#blackCard"),
+  turnHint: document.querySelector("#turnHint"),
+  drawBtn: document.querySelector("#drawBtn"),
+  resignBtn: document.querySelector("#resignBtn"),
   countdownOverlay: document.querySelector("#countdownOverlay"),
   countdownValue: document.querySelector("#countdownValue"),
   screens: {
@@ -107,6 +102,11 @@ els.joinRoomBtn.addEventListener("click", () => send("joinRoom", { name: state.p
 
 els.readyBtn.addEventListener("click", () => send("setReady", { ready: !state.ready }));
 els.startMatchBtn.addEventListener("click", () => send("startMatch", {}));
+els.drawBtn.addEventListener("click", () => {
+  const offered = readDict(state.snapshot?.drawOffers, normalizeSide(state.mySide));
+  send("setDrawOffer", { offered: !offered });
+});
+els.resignBtn.addEventListener("click", () => send("resign", {}));
 
 els.rulesForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -136,6 +136,7 @@ function showScreen(name) {
   for (const [key, element] of Object.entries(els.screens)) {
     element.classList.toggle("active", key === name);
   }
+  document.body.classList.toggle("game-mode", name === "game");
   if (name === "room") {
     startRoomRefresh();
   } else {
@@ -147,7 +148,7 @@ function renderAll() {
   renderMeta();
   renderReady();
   syncRulesForm();
-  renderCards();
+  renderGameHud();
   renderBoard();
   renderCountdown();
 }
@@ -173,20 +174,17 @@ function renderReady() {
   els.startMatchBtn.disabled = !state.isHost || !whiteReady || !blackReady;
 }
 
-function renderCards() {
+function renderGameHud() {
   const snap = state.snapshot;
   if (!snap) return;
-  const whiteStats = readDict(snap.stats, "white") || {};
-  const blackStats = readDict(snap.stats, "black") || {};
-  els.whiteName.textContent = readDict(snap.players, "white") || "-";
-  els.blackName.textContent = readDict(snap.players, "black") || "-";
-  els.whiteTime.textContent = fmtTime(readDict(snap.remainingTurnMs, "white"));
-  els.blackTime.textContent = fmtTime(readDict(snap.remainingTurnMs, "black"));
-  els.whiteStats.textContent = fmtStats(whiteStats);
-  els.blackStats.textContent = fmtStats(blackStats);
-  const turn = normalizeSide(snap.currentTurn);
-  els.whiteCard.classList.toggle("active", turn === "white");
-  els.blackCard.classList.toggle("active", turn === "black");
+  const turnSide = normalizeSide(snap.currentTurn);
+  const turnName = readDict(snap.players, turnSide) || humanSide(turnSide);
+  const myOffer = readDict(snap.drawOffers, normalizeSide(state.mySide));
+  const opponentSide = normalizeSide(state.mySide) === "white" ? "black" : "white";
+  const opponentOffer = readDict(snap.drawOffers, opponentSide);
+  const time = fmtTime(readDict(snap.remainingTurnMs, turnSide));
+  els.turnHint.textContent = `Am Zug: ${turnName} (${time})${opponentOffer && !myOffer ? " | Gegner bietet Remis an" : ""}`;
+  els.drawBtn.textContent = opponentOffer && !myOffer ? "Remis annehmen" : (myOffer ? "Remisangebot zurueckziehen" : "Remis anbieten");
 }
 
 function renderBoard() {
@@ -345,7 +343,7 @@ function stopRoomRefresh() {
 
 setInterval(() => {
   if (state.snapshot) {
-    renderCards();
+    renderGameHud();
     renderCountdown();
   }
 }, 250);

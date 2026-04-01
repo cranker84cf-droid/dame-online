@@ -90,6 +90,7 @@ public sealed class GameSnapshot
     public required Dictionary<PlayerSide, long> RemainingTurnMs { get; init; }
     public required Dictionary<PlayerSide, PlayerStats> Stats { get; init; }
     public required Dictionary<PlayerSide, bool> ReadyStates { get; init; }
+    public required Dictionary<PlayerSide, bool> DrawOffers { get; init; }
     public required Dictionary<PlayerSide, PlayerAppearance> AppearanceBySide { get; init; }
     public required long? CountdownEndsAtUnixMs { get; init; }
     public required bool IsGameOver { get; init; }
@@ -152,6 +153,11 @@ public sealed class SetAppearanceRequest
 public sealed class SetReadyRequest
 {
     public required bool Ready { get; init; }
+}
+
+public sealed class SetDrawOfferRequest
+{
+    public required bool Offered { get; init; }
 }
 
 public sealed class PlayerAppearance
