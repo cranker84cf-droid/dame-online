@@ -20,6 +20,7 @@ const els = {
   playerName: document.querySelector("#playerName"),
   confirmNameBtn: document.querySelector("#confirmNameBtn"),
   confirmedNameValue: document.querySelector("#confirmedNameValue"),
+  playerWinsValue: document.querySelector("#playerWinsValue"),
   roomCode: document.querySelector("#roomCode"),
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
@@ -95,6 +96,8 @@ els.confirmNameBtn.addEventListener("click", () => {
   els.confirmedNameValue.textContent = name;
   showScreen("room");
   setBanner(`Willkommen ${name}. Jetzt kannst du einen Raum erstellen oder betreten.`);
+  loadPlayerStats();
+  loadOpenRooms();
 });
 
 els.createRoomBtn.addEventListener("click", () => send("createRoom", { name: state.playerName }));
@@ -297,6 +300,17 @@ function fmtStats(stats) {
 
 function setBanner(text) {
   els.statusBanner.textContent = text;
+}
+
+async function loadPlayerStats() {
+  if (!state.playerName) return;
+  try {
+    const response = await fetch(`/api/player?name=${encodeURIComponent(state.playerName)}`, { cache: "no-store" });
+    const profile = await response.json();
+    els.playerWinsValue.textContent = profile?.stats?.wins ?? 0;
+  } catch {
+    els.playerWinsValue.textContent = "0";
+  }
 }
 
 async function loadOpenRooms() {

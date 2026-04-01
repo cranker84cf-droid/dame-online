@@ -237,6 +237,15 @@ public sealed class RoomManager
         if (room.Game.IsGameOver)
         {
             await UpdateStatsAfterGameAsync(room, session.Name);
+            room.ReadyBySide[PlayerSide.White] = false;
+            room.ReadyBySide[PlayerSide.Black] = false;
+            room.DrawOfferBySide[PlayerSide.White] = false;
+            room.DrawOfferBySide[PlayerSide.Black] = false;
+            var resultMessage = room.Game.StatusMessage;
+            room.Game = CreateGame(room);
+            room.Phase = "setup";
+            room.CountdownEndsAt = null;
+            await BroadcastMessage(room, "toast", new { message = resultMessage });
         }
         else if (room.Game.LastMoveDurationMs > 0)
         {

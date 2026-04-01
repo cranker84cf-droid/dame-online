@@ -126,7 +126,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .piece.black { color: #f5f0e6; }
 .piece.white { color: #1f1a16; }
-.piece.king::after { content: "D"; }
+.piece.king.white::after { content: "D"; color: #111; }
+.piece.king.black::after { content: "D"; color: #fff; }
 .piece.selected { outline: 4px solid rgba(85, 201, 113, 0.92); transform: scale(1.04); }
 .piece::after { content: attr(data-symbol); font-size: clamp(0.8rem, 1.3vw, 1.2rem); font-weight: 700; }
 .countdown-overlay {

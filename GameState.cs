@@ -7,8 +7,8 @@ public sealed class GameState
     private readonly List<Piece> _capturedBlack = [];
     private readonly Dictionary<PlayerSide, long> _remainingTurnMs = new()
     {
-        [PlayerSide.White] = 120_000,
-        [PlayerSide.Black] = 120_000
+        [PlayerSide.White] = 0,
+        [PlayerSide.Black] = 0
     };
 
     private DateTimeOffset _turnStartedAt = DateTimeOffset.UtcNow;
@@ -189,7 +189,7 @@ public sealed class GameState
     {
         var remaining = new Dictionary<PlayerSide, long>(_remainingTurnMs)
         {
-            [CurrentTurn] = Math.Max(0, _remainingTurnMs[CurrentTurn] - (long)(DateTimeOffset.UtcNow - _turnStartedAt).TotalMilliseconds)
+            [CurrentTurn] = Math.Max(0, _remainingTurnMs[CurrentTurn] + (long)(DateTimeOffset.UtcNow - _turnStartedAt).TotalMilliseconds)
         };
 
         return new GameSnapshot
@@ -659,7 +659,7 @@ public sealed class GameState
     private long ConsumeTurnTime(PlayerSide side)
     {
         var elapsed = Math.Max(0, (long)(DateTimeOffset.UtcNow - _turnStartedAt).TotalMilliseconds);
-        _remainingTurnMs[side] = Math.Max(0, _remainingTurnMs[side] - elapsed);
+        _remainingTurnMs[side] += elapsed;
         return elapsed;
     }
 
@@ -680,13 +680,6 @@ public sealed class GameState
     {
         foreach (var side in new[] { PlayerSide.White, PlayerSide.Black })
         {
-            if (_remainingTurnMs[side] <= 0)
-            {
-                var winner = side == PlayerSide.White ? PlayerSide.Black : PlayerSide.White;
-                DeclareWinner(winner, $"Zeit abgelaufen. {Players[winner]} gewinnt.");
-                return;
-            }
-
             var ownsPiece = _pieces.Values.Any(v => v.Piece.Side == side);
             if (!ownsPiece)
             {
