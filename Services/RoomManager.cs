@@ -121,8 +121,8 @@ public sealed class RoomManager
             },
             AppearanceBySide = new Dictionary<PlayerSide, PlayerAppearance>
             {
-                [PlayerSide.White] = new PlayerAppearance { PieceColor = "#f6f0d9", KingColor = "#e39a34" },
-                [PlayerSide.Black] = new PlayerAppearance { PieceColor = "#2d2b2a", KingColor = "#8c6bff" }
+                [PlayerSide.White] = new PlayerAppearance { PieceColor = "#f4f0e8", KingColor = "#f4f0e8" },
+                [PlayerSide.Black] = new PlayerAppearance { PieceColor = "#202020", KingColor = "#202020" }
             },
             Phase = "room"
         };
@@ -436,5 +436,19 @@ public sealed class RoomManager
             room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.White)?.Name ?? "",
             room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.Black)?.Name ?? "");
         return game;
+    }
+
+    public IReadOnlyList<OpenRoomInfo> GetOpenRooms()
+    {
+        return _rooms.Values
+            .Where(room => room.Sessions.Count < 2)
+            .OrderBy(room => room.Code)
+            .Select(room => new OpenRoomInfo
+            {
+                RoomCode = room.Code,
+                HostName = room.HostName,
+                PlayerCount = room.Sessions.Count
+            })
+            .ToList();
     }
 }

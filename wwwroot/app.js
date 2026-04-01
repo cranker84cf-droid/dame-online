@@ -12,6 +12,7 @@ const state = {
   selectedPieceId: null,
   targets: [],
   ready: false,
+  roomsRefreshId: null,
 };
 
 const els = {
@@ -22,13 +23,11 @@ const els = {
   roomCode: document.querySelector("#roomCode"),
   createRoomBtn: document.querySelector("#createRoomBtn"),
   joinRoomBtn: document.querySelector("#joinRoomBtn"),
+  openRoomsList: document.querySelector("#openRoomsList"),
   roomCodeValue: document.querySelector("#roomCodeValue"),
   hostNameValue: document.querySelector("#hostNameValue"),
   playerSideValue: document.querySelector("#playerSideValue"),
   setupStatusValue: document.querySelector("#setupStatusValue"),
-  pieceColor: document.querySelector("#pieceColor"),
-  kingColor: document.querySelector("#kingColor"),
-  saveAppearanceBtn: document.querySelector("#saveAppearanceBtn"),
   readyBtn: document.querySelector("#readyBtn"),
   startMatchBtn: document.querySelector("#startMatchBtn"),
   whiteReadyLabel: document.querySelector("#whiteReadyLabel"),
@@ -106,14 +105,6 @@ els.confirmNameBtn.addEventListener("click", () => {
 els.createRoomBtn.addEventListener("click", () => send("createRoom", { name: state.playerName }));
 els.joinRoomBtn.addEventListener("click", () => send("joinRoom", { name: state.playerName, roomCode: els.roomCode.value.trim().toUpperCase() }));
 
-els.saveAppearanceBtn.addEventListener("click", () => {
-  send("setAppearance", {
-    pieceColor: els.pieceColor.value,
-    kingColor: els.kingColor.value
-  });
-  send("setReady", { ready: false });
-});
-
 els.readyBtn.addEventListener("click", () => send("setReady", { ready: !state.ready }));
 els.startMatchBtn.addEventListener("click", () => send("startMatch", {}));
 
@@ -145,6 +136,11 @@ function showScreen(name) {
   for (const [key, element] of Object.entries(els.screens)) {
     element.classList.toggle("active", key === name);
   }
+  if (name === "room") {
+    startRoomRefresh();
+  } else {
+    stopRoomRefresh();
+  }
 }
 
 function renderAll() {
@@ -164,11 +160,6 @@ function renderMeta() {
   els.playerSideValue.textContent = humanSide(state.mySide);
   els.setupStatusValue.textContent = snap.statusMessage;
   setBanner(snap.statusMessage);
-  const myAppearance = readDict(snap.appearanceBySide, normalizeSide(state.mySide));
-  if (myAppearance) {
-    els.pieceColor.value = myAppearance.pieceColor;
-    els.kingColor.value = myAppearance.kingColor;
-  }
 }
 
 function renderReady() {
@@ -202,10 +193,6 @@ function renderBoard() {
   els.board.innerHTML = "";
   const snap = state.snapshot;
   const pieces = snap?.pieces ? Object.values(snap.pieces) : [];
-  const appearance = snap?.appearanceBySide || {};
-  const whiteAppearance = readDict(appearance, "white");
-  const blackAppearance = readDict(appearance, "black");
-
   for (let row = 0; row < 10; row++) {
     for (let col = 0; col < 10; col++) {
       const square = document.createElement("button");
@@ -220,9 +207,8 @@ function renderBoard() {
       if (piece) {
         const el = document.createElement("div");
         const side = normalizeSide(piece.side);
-        const colors = side === "white" ? whiteAppearance : blackAppearance;
         el.className = `piece ${side} ${piece.isKing ? "king" : ""}`;
-        el.style.background = piece.isKing ? colors?.kingColor ?? "#d4a638" : colors?.pieceColor ?? "#f6f0d9";
+        el.style.background = side === "white" ? "#f4f0e8" : "#202020";
         if (piece.id === state.selectedPieceId) el.classList.add("selected");
         el.dataset.symbol = piece.isKing ? "D" : "";
         el.addEventListener("click", (event) => {
@@ -316,6 +302,45 @@ function fmtStats(stats) {
 
 function setBanner(text) {
   els.statusBanner.textContent = text;
+}
+
+async function loadOpenRooms() {
+  if (state.currentScreen !== "room") return;
+  try {
+    const response = await fetch("/api/rooms", { cache: "no-store" });
+    const rooms = await response.json();
+    if (!rooms.length) {
+      els.openRoomsList.innerHTML = "<p>Im Moment ist kein offener Raum vorhanden.</p>";
+      return;
+    }
+    els.openRoomsList.innerHTML = rooms.map((room) => `
+      <button type="button" class="room-entry" data-code="${room.roomCode}">
+        <strong>${room.roomCode}</strong>
+        <span>Host: ${room.hostName}</span>
+        <span>${room.playerCount}/2 Spieler</span>
+      </button>
+    `).join("");
+    els.openRoomsList.querySelectorAll(".room-entry").forEach((button) => {
+      button.addEventListener("click", () => {
+        els.roomCode.value = button.dataset.code;
+      });
+    });
+  } catch {
+    els.openRoomsList.innerHTML = "<p>Offene Raeume konnten gerade nicht geladen werden.</p>";
+  }
+}
+
+function startRoomRefresh() {
+  stopRoomRefresh();
+  loadOpenRooms();
+  state.roomsRefreshId = setInterval(loadOpenRooms, 5000);
+}
+
+function stopRoomRefresh() {
+  if (state.roomsRefreshId) {
+    clearInterval(state.roomsRefreshId);
+    state.roomsRefreshId = null;
+  }
 }
 
 setInterval(() => {

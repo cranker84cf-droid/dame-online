@@ -16,6 +16,7 @@ app.UseStaticFiles();
 app.UseWebSockets();
 
 app.MapGet("/health", () => Results.Ok(new { ok = true }));
+app.MapGet("/api/rooms", (RoomManager manager) => Results.Ok(manager.GetOpenRooms()));
 
 app.Map("/ws", async context =>
 {

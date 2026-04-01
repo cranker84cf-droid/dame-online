@@ -116,6 +116,12 @@ public sealed class GameState
             return new MoveResult { Success = false, Message = "Ungueltiger Stein." };
         }
 
+        var preMoveCapturers = GetLegalMoves(player)
+            .Where(m => m.CapturedPieceIds.Count > 0)
+            .Select(m => m.PieceId)
+            .Distinct()
+            .ToHashSet();
+
         var legalMoves = GetLegalMoves(player).Where(m => m.PieceId == command.PieceId).ToList();
         var move = legalMoves.FirstOrDefault(m => PathsEqual(m.Path, command.Path));
         if (move is null)
@@ -129,7 +135,7 @@ public sealed class GameState
 
         if (move.CapturedPieceIds.Count == 0 && move.MissedMandatoryCapture)
         {
-            ApplyMissedCapturePenalty(player, command.PieceId);
+            ApplyMissedCapturePenalty(player, command.PieceId, preMoveCapturers);
         }
 
         var currentPiece = _pieces[command.PieceId].Piece;
@@ -596,7 +602,7 @@ public sealed class GameState
         }
     }
 
-    private void ApplyMissedCapturePenalty(PlayerSide player, string movedPieceId)
+    private void ApplyMissedCapturePenalty(PlayerSide player, string movedPieceId, HashSet<string> preMoveCapturers)
     {
         switch (Rules.MissedCapturePenalty)
         {
@@ -612,21 +618,15 @@ public sealed class GameState
                 StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht. Der Gegner erhaelt einen Stein zurueck.";
                 break;
             default:
-                RemovePenaltyPiece(player, movedPieceId);
+                RemovePenaltyPiece(movedPieceId, preMoveCapturers);
                 StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht. Ein schlagfaehiger Stein wurde entfernt.";
                 break;
         }
     }
 
-    private void RemovePenaltyPiece(PlayerSide player, string movedPieceId)
+    private void RemovePenaltyPiece(string movedPieceId, HashSet<string> preMoveCapturers)
     {
-        var capturingIds = GetLegalMoves(player)
-            .Where(m => m.CapturedPieceIds.Count > 0)
-            .Select(m => m.PieceId)
-            .Distinct()
-            .ToList();
-
-        var targetId = capturingIds.Contains(movedPieceId) ? movedPieceId : capturingIds.FirstOrDefault();
+        var targetId = preMoveCapturers.Contains(movedPieceId) ? movedPieceId : preMoveCapturers.FirstOrDefault();
         if (targetId is not null)
         {
             _pieces.Remove(targetId);

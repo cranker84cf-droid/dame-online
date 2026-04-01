@@ -159,3 +159,10 @@ public sealed class PlayerAppearance
     public required string PieceColor { get; init; }
     public required string KingColor { get; init; }
 }
+
+public sealed class OpenRoomInfo
+{
+    public required string RoomCode { get; init; }
+    public required string HostName { get; init; }
+    public required int PlayerCount { get; init; }
+}
