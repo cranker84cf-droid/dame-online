@@ -308,12 +308,9 @@ public sealed class GameState
     private List<LegalMove> GetMovesForPiece(string pieceId)
     {
         var captures = GetCaptureMovesForPiece(pieceId);
-        if (captures.Count > 0)
-        {
-            return captures;
-        }
-
-        return GetNonCaptureMovesForPiece(pieceId);
+        var moves = new List<LegalMove>(captures);
+        moves.AddRange(GetNonCaptureMovesForPiece(pieceId));
+        return moves;
     }
 
     private List<LegalMove> GetCaptureMovesForPiece(string pieceId)
