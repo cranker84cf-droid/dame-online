@@ -24,6 +24,7 @@ public sealed class RulesConfig
     public bool RequireMultiCapture { get; set; } = true;
     public bool MenCanCaptureBackward { get; set; } = false;
     public bool KingsMoveMultipleSquares { get; set; } = true;
+    public bool KingsMustLandDirectlyAfterCapture { get; set; } = true;
     public bool KingsMustCapture { get; set; } = true;
     public bool KingsCanMultiCapture { get; set; } = true;
     public bool KingsCanChangeDirectionDuringMultiCapture { get; set; } = true;

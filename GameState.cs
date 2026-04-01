@@ -408,6 +408,14 @@ public sealed class GameState
                 {
                     if (!string.IsNullOrEmpty(enemyId))
                     {
+                        var captured = board[enemyId];
+                        var directLanding = (Row: captured.Row + dRow, Col: captured.Col + dCol);
+                        if (targetRow != directLanding.Row || targetCol != directLanding.Col)
+                        {
+                            step++;
+                            continue;
+                        }
+
                         moves.Add(new LegalMove
                         {
                             PieceId = pieceId,
@@ -743,12 +751,14 @@ public sealed class GameState
             RequireMultiCapture = rules.RequireMultiCapture,
             MenCanCaptureBackward = rules.MenCanCaptureBackward,
             KingsMoveMultipleSquares = rules.KingsMoveMultipleSquares,
+            KingsMustLandDirectlyAfterCapture = rules.KingsMustLandDirectlyAfterCapture,
             KingsMustCapture = rules.KingsMustCapture,
             KingsCanMultiCapture = rules.KingsCanMultiCapture,
             KingsCanChangeDirectionDuringMultiCapture = rules.KingsCanChangeDirectionDuringMultiCapture,
             MissedCapturePenalty = rules.MissedCapturePenalty,
             MissedCaptureTimePenaltySeconds = rules.MissedCaptureTimePenaltySeconds
         };
+
 
     private sealed class LegalMove
     {
