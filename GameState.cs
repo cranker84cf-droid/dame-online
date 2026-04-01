@@ -129,7 +129,7 @@ public sealed class GameState
             return new MoveResult { Success = false, Message = "Ungueltiger Stein." };
         }
 
-        var preMoveCapturers = GetLegalMoves(player)
+        var preMoveCapturers = GetLegalMoves(player, ignoreSelection: true)
             .Where(m => m.CapturedPieceIds.Count > 0)
             .Select(m => m.PieceId)
             .Distinct()
@@ -277,19 +277,21 @@ public sealed class GameState
 
     private static int ForwardStep(PlayerSide side) => side == PlayerSide.White ? -1 : 1;
 
-    private List<LegalMove> GetLegalMoves(PlayerSide player)
+    private List<LegalMove> GetLegalMoves(PlayerSide player, bool ignoreSelection = false)
     {
         var allMoves = _pieces.Values
             .Where(v => v.Piece.Side == player)
             .SelectMany(v => GetMovesForPiece(v.Piece.Id))
             .ToList();
 
-        if (SelectedPieceId is not null)
+        if (!ignoreSelection && SelectedPieceId is not null)
         {
             allMoves = allMoves.Where(m => m.PieceId == SelectedPieceId).ToList();
         }
 
-        var capturingPieces = allMoves
+        var capturingPieces = _pieces.Values
+            .Where(v => v.Piece.Side == player)
+            .SelectMany(v => GetMovesForPiece(v.Piece.Id))
             .Where(m => m.CapturedPieceIds.Count > 0)
             .Select(m => m.PieceId)
             .Distinct()
