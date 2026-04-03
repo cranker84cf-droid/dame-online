@@ -120,6 +120,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .square.light { background: var(--board-light); }
 .square.dark { background: var(--board-dark); }
+.square.penalty {
+  animation: penaltyFlash 0.25s linear 8;
+}
 .square.target::after {
   content: "";
   width: 28%;
@@ -171,6 +174,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: rgba(255,255,255,0.72);
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+@keyframes penaltyFlash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.75); }
 }
 
 @media (max-width: 900px) {

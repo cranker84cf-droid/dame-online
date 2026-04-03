@@ -146,12 +146,26 @@ public sealed class GameState
         LastMoveDurationMs = moveDurationMs;
         ExecuteMove(move, out var promoted);
 
+        PenaltyMarker? penaltyMarker = null;
         if (move.CapturedPieceIds.Count == 0 && move.MissedMandatoryCapture)
         {
-            ApplyMissedCapturePenalty(player, command.PieceId, preMoveCapturers);
+            penaltyMarker = ApplyMissedCapturePenalty(player, command.PieceId, preMoveCapturers);
         }
 
-        var currentPiece = _pieces[command.PieceId].Piece;
+        if (!_pieces.TryGetValue(command.PieceId, out var currentEntry))
+        {
+            EvaluateGameOver();
+            return new MoveResult
+            {
+                Success = true,
+                Message = StatusMessage,
+                AwaitingResolution = true,
+                ContinuationRequired = false,
+                PenaltyMarker = penaltyMarker
+            };
+        }
+
+        var currentPiece = currentEntry.Piece;
         var canContinue = move.CapturedPieceIds.Count > 0
             && !promoted
             && AllowFurtherCapture(currentPiece)
@@ -162,19 +176,59 @@ public sealed class GameState
             SelectedPieceId = command.PieceId;
             _turnStartedAt = DateTimeOffset.UtcNow;
             StatusMessage = $"{Players[player]} muss die Schlagserie fortsetzen.";
-            return new MoveResult { Success = true, Message = StatusMessage };
+            return new MoveResult
+            {
+                Success = true,
+                Message = StatusMessage,
+                AwaitingResolution = true,
+                ContinuationRequired = true,
+                PenaltyMarker = penaltyMarker
+            };
         }
 
         SelectedPieceId = null;
         UpdateBestMove(player, moveDurationMs);
-        AdvanceTurn();
+        StatusMessage = "Zug abgeschlossen.";
+
+        return new MoveResult
+        {
+            Success = true,
+            Message = StatusMessage,
+            AwaitingResolution = true,
+            ContinuationRequired = false,
+            PenaltyMarker = penaltyMarker
+        };
+    }
+
+    public MoveResult FinalizeResolvedTurn()
+    {
         EvaluateGameOver();
         if (!IsGameOver)
         {
+            AdvanceTurn();
             StatusMessage = $"Am Zug: {Players[CurrentTurn]}";
         }
 
         return new MoveResult { Success = true, Message = StatusMessage };
+    }
+
+    public MoveResult ResolveMissedContinuation(PlayerSide player, string pieceId)
+    {
+        var penaltyMarker = ApplyMissedCapturePenalty(player, pieceId, [pieceId]);
+        SelectedPieceId = null;
+        EvaluateGameOver();
+        if (!IsGameOver)
+        {
+            AdvanceTurn();
+            StatusMessage = $"Am Zug: {Players[CurrentTurn]}";
+        }
+
+        return new MoveResult
+        {
+            Success = true,
+            Message = StatusMessage,
+            PenaltyMarker = penaltyMarker
+        };
     }
 
     public GameSnapshot ToSnapshot(
@@ -185,7 +239,10 @@ public sealed class GameState
         Dictionary<PlayerSide, bool> readyStates,
         Dictionary<PlayerSide, bool> drawOffers,
         Dictionary<PlayerSide, PlayerAppearance> appearanceBySide,
-        DateTimeOffset? countdownEndsAt)
+        DateTimeOffset? countdownEndsAt,
+        DateTimeOffset? resolutionDeadlineAt,
+        bool continuationRequired,
+        PenaltyMarker? penaltyMarker)
     {
         var remaining = new Dictionary<PlayerSide, long>(_remainingTurnMs)
         {
@@ -222,6 +279,9 @@ public sealed class GameState
                     KingColor = kvp.Value.KingColor
                 }),
             CountdownEndsAtUnixMs = countdownEndsAt?.ToUnixTimeMilliseconds(),
+            ResolutionDeadlineUnixMs = resolutionDeadlineAt?.ToUnixTimeMilliseconds(),
+            ContinuationRequired = continuationRequired,
+            PenaltyMarker = penaltyMarker,
             IsGameOver = IsGameOver,
             StatusMessage = StatusMessage,
             SelectedPieceId = SelectedPieceId,
@@ -578,45 +638,44 @@ public sealed class GameState
         }
     }
 
-    private void ApplyMissedCapturePenalty(PlayerSide player, string movedPieceId, HashSet<string> preMoveCapturers)
+    private PenaltyMarker? ApplyMissedCapturePenalty(PlayerSide player, string movedPieceId, HashSet<string> preMoveCapturers)
     {
         switch (Rules.MissedCapturePenalty)
         {
             case PenaltyType.None:
                 StatusMessage = $"{Players[player]} hat die Schlagpflicht ignoriert.";
-                break;
+                return null;
             case PenaltyType.TimePenalty:
-                _remainingTurnMs[player] = Math.Max(0, _remainingTurnMs[player] - (Rules.MissedCaptureTimePenaltySeconds * 1000L));
+                _remainingTurnMs[player] += Rules.MissedCaptureTimePenaltySeconds * 1000L;
                 StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht und erhaelt eine Zeitstrafe.";
-                break;
+                return null;
             case PenaltyType.RestoreOpponentPiece:
-                RestoreOpponentPiece(player);
-                StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht. Der Gegner erhaelt einen Stein zurueck.";
-                break;
+                return RestoreOpponentPiece(player);
             default:
-                RemovePenaltyPiece(movedPieceId, preMoveCapturers);
-                StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht. Ein schlagfaehiger Stein wurde entfernt.";
-                break;
+                return RemovePenaltyPiece(movedPieceId, preMoveCapturers);
         }
     }
 
-    private void RemovePenaltyPiece(string movedPieceId, HashSet<string> preMoveCapturers)
+    private PenaltyMarker? RemovePenaltyPiece(string movedPieceId, HashSet<string> preMoveCapturers)
     {
         var targetId = preMoveCapturers.Contains(movedPieceId) ? movedPieceId : preMoveCapturers.FirstOrDefault();
-        if (targetId is not null)
+        if (targetId is not null && _pieces.Remove(targetId, out var removed))
         {
-            _pieces.Remove(targetId);
+            StatusMessage = "Schlagpflicht verletzt. Ein schlagfaehiger Stein wurde entfernt.";
+            return CreatePenaltyMarker(removed.Row, removed.Col, StatusMessage);
         }
+
+        return null;
     }
 
-    private void RestoreOpponentPiece(PlayerSide player)
+    private PenaltyMarker? RestoreOpponentPiece(PlayerSide player)
     {
         var opponent = player == PlayerSide.White ? PlayerSide.Black : PlayerSide.White;
         var capturedList = opponent == PlayerSide.White ? _capturedWhite : _capturedBlack;
         var piece = capturedList.LastOrDefault();
         if (piece is null)
         {
-            return;
+            return null;
         }
 
         foreach (var row in GetSpawnRows(opponent))
@@ -631,9 +690,12 @@ public sealed class GameState
                 capturedList.Remove(piece);
                 piece.IsKing = false;
                 AddPiece(row, col, piece);
-                return;
+                StatusMessage = $"{Players[player]} ignoriert die Schlagpflicht. Der Gegner erhaelt einen Stein zurueck.";
+                return CreatePenaltyMarker(row, col, StatusMessage);
             }
         }
+
+        return null;
     }
 
     private static IEnumerable<int> GetSpawnRows(PlayerSide side)
@@ -757,6 +819,15 @@ public sealed class GameState
             KingsCanChangeDirectionDuringMultiCapture = rules.KingsCanChangeDirectionDuringMultiCapture,
             MissedCapturePenalty = rules.MissedCapturePenalty,
             MissedCaptureTimePenaltySeconds = rules.MissedCaptureTimePenaltySeconds
+        };
+
+    private static PenaltyMarker CreatePenaltyMarker(int row, int col, string message) =>
+        new()
+        {
+            Row = row,
+            Col = col,
+            ExpiresAtUnixMs = DateTimeOffset.UtcNow.AddSeconds(2).ToUnixTimeMilliseconds(),
+            Message = message
         };
 
 

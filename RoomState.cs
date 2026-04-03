@@ -13,4 +13,8 @@ public sealed class RoomState
     public required Dictionary<PlayerSide, PlayerAppearance> AppearanceBySide { get; init; }
     public required string Phase { get; set; }
     public DateTimeOffset? CountdownEndsAt { get; set; }
+    public DateTimeOffset? ResolutionDeadlineAt { get; set; }
+    public bool ContinuationRequired { get; set; }
+    public PenaltyMarker? PenaltyMarker { get; set; }
+    public CancellationTokenSource? PendingResolutionCts { get; set; }
 }

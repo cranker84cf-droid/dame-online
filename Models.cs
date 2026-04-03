@@ -55,6 +55,9 @@ public sealed class MoveResult
 {
     public required bool Success { get; init; }
     public required string Message { get; init; }
+    public bool AwaitingResolution { get; init; }
+    public bool ContinuationRequired { get; init; }
+    public PenaltyMarker? PenaltyMarker { get; init; }
 }
 
 public sealed class PlayerStats
@@ -94,10 +97,21 @@ public sealed class GameSnapshot
     public required Dictionary<PlayerSide, bool> DrawOffers { get; init; }
     public required Dictionary<PlayerSide, PlayerAppearance> AppearanceBySide { get; init; }
     public required long? CountdownEndsAtUnixMs { get; init; }
+    public required long? ResolutionDeadlineUnixMs { get; init; }
+    public required bool ContinuationRequired { get; init; }
+    public required PenaltyMarker? PenaltyMarker { get; init; }
     public required bool IsGameOver { get; init; }
     public required string StatusMessage { get; init; }
     public required string? SelectedPieceId { get; init; }
     public required List<Position> ForcedDestinations { get; init; }
+}
+
+public sealed class PenaltyMarker
+{
+    public required int Row { get; init; }
+    public required int Col { get; init; }
+    public required long ExpiresAtUnixMs { get; init; }
+    public required string Message { get; init; }
 }
 
 public sealed class PieceView

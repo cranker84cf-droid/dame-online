@@ -13,6 +13,7 @@ const state = {
   targets: [],
   ready: false,
   roomsRefreshId: null,
+  lastPenaltySeen: 0,
 };
 
 const els = {
@@ -187,7 +188,9 @@ function renderGameHud() {
   const opponentSide = normalizeSide(state.mySide) === "white" ? "black" : "white";
   const opponentOffer = readDict(snap.drawOffers, opponentSide);
   const time = fmtTime(readDict(snap.remainingTurnMs, turnSide));
-  els.turnHint.textContent = `Am Zug: ${turnName} (${time})${opponentOffer && !myOffer ? " | Gegner bietet Remis an" : ""}`;
+  const resolutionSeconds = snap.resolutionDeadlineUnixMs ? Math.max(0, Math.ceil((snap.resolutionDeadlineUnixMs - Date.now()) / 1000)) : null;
+  const resolutionText = resolutionSeconds !== null ? ` | ${snap.continuationRequired ? "Schlagfolge" : "Zugende"} in ${resolutionSeconds}s` : "";
+  els.turnHint.textContent = `Am Zug: ${turnName} (${time})${opponentOffer && !myOffer ? " | Gegner bietet Remis an" : ""}${resolutionText}`;
   els.drawBtn.textContent = opponentOffer && !myOffer ? "Remis annehmen" : (myOffer ? "Remisangebot zurueckziehen" : "Remis anbieten");
 }
 
@@ -200,6 +203,9 @@ function renderBoard() {
       const square = document.createElement("button");
       square.type = "button";
       square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+      if (snap?.penaltyMarker && Date.now() < snap.penaltyMarker.expiresAtUnixMs && snap.penaltyMarker.row === row && snap.penaltyMarker.col === col) {
+        square.classList.add("penalty");
+      }
       square.addEventListener("click", () => onSquareClick(row, col));
 
       const piece = pieces.find((entry) => entry.row === row && entry.col === col);
@@ -341,6 +347,29 @@ async function loadOpenRooms() {
   }
 }
 
+function maybePlayPenaltyAlert() {
+  const marker = state.snapshot?.penaltyMarker;
+  if (!marker || marker.expiresAtUnixMs <= Date.now() || marker.expiresAtUnixMs === state.lastPenaltySeen) {
+    return;
+  }
+
+  state.lastPenaltySeen = marker.expiresAtUnixMs;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.02;
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.18);
+    oscillator.onended = () => ctx.close();
+  } catch {
+  }
+}
+
 function startRoomRefresh() {
   stopRoomRefresh();
   loadOpenRooms();
@@ -358,5 +387,7 @@ setInterval(() => {
   if (state.snapshot) {
     renderGameHud();
     renderCountdown();
+    renderBoard();
+    maybePlayPenaltyAlert();
   }
 }, 250);

@@ -90,6 +90,10 @@ public sealed class RoomManager
 
             room.ReadyBySide[session.Side] = false;
             room.Phase = room.Sessions.Count < 2 ? "room" : "setup";
+            room.PendingResolutionCts?.Cancel();
+            room.PendingResolutionCts = null;
+            room.ResolutionDeadlineAt = null;
+            room.ContinuationRequired = false;
             room.Game = CreateGame(room);
             await BroadcastSnapshot(room);
             await BroadcastMessage(room, "toast", new { message = $"{session.Name} hat den Raum verlassen." });
@@ -257,6 +261,12 @@ public sealed class RoomManager
             });
         }
 
+        room.PenaltyMarker = result.PenaltyMarker;
+        if (room.Phase == "game")
+        {
+            ScheduleResolution(room, session.Side, request.PieceId, result.ContinuationRequired);
+        }
+
         await BroadcastSnapshot(room);
     }
 
@@ -328,6 +338,7 @@ public sealed class RoomManager
         var opponent = session.Side == PlayerSide.White ? PlayerSide.Black : PlayerSide.White;
         if (request.Offered && room.DrawOfferBySide[opponent])
         {
+            room.PendingResolutionCts?.Cancel();
             room.Game.EndAsDraw();
             await UpdateDrawStatsAsync(room);
             room.ReadyBySide[PlayerSide.White] = false;
@@ -356,6 +367,7 @@ public sealed class RoomManager
         }
 
         room.Game.EndByResignation(session.Side);
+        room.PendingResolutionCts?.Cancel();
         await UpdateStatsAfterGameAsync(room, session.Name);
         room.ReadyBySide[PlayerSide.White] = false;
         room.ReadyBySide[PlayerSide.Black] = false;
@@ -395,9 +407,13 @@ public sealed class RoomManager
 
         room.Game = CreateGame(room);
         room.Game.SetStartingPlayer(Random.Shared.Next(2) == 0 ? PlayerSide.White : PlayerSide.Black);
+        room.PendingResolutionCts?.Cancel();
         room.DrawOfferBySide[PlayerSide.White] = false;
         room.DrawOfferBySide[PlayerSide.Black] = false;
         room.Phase = "countdown";
+        room.ResolutionDeadlineAt = null;
+        room.ContinuationRequired = false;
+        room.PenaltyMarker = null;
         room.CountdownEndsAt = DateTimeOffset.UtcNow.AddSeconds(5);
         await BroadcastSnapshot(room);
 
@@ -491,7 +507,10 @@ public sealed class RoomManager
             room.ReadyBySide,
             room.DrawOfferBySide,
             room.AppearanceBySide,
-            room.CountdownEndsAt);
+            room.CountdownEndsAt,
+            room.ResolutionDeadlineAt,
+            room.ContinuationRequired,
+            room.PenaltyMarker);
         await BroadcastMessage(room, "snapshot", snapshot);
     }
 
@@ -529,6 +548,61 @@ public sealed class RoomManager
             room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.White)?.Name ?? "",
             room.Sessions.Values.FirstOrDefault(s => s.Side == PlayerSide.Black)?.Name ?? "");
         return game;
+    }
+
+    private void ScheduleResolution(RoomState room, PlayerSide player, string pieceId, bool continuationRequired)
+    {
+        room.PendingResolutionCts?.Cancel();
+        room.PendingResolutionCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        room.PendingResolutionCts = cts;
+        room.ContinuationRequired = continuationRequired;
+        room.ResolutionDeadlineAt = DateTimeOffset.UtcNow.AddSeconds(3);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), cts.Token);
+                if (cts.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                MoveResult result;
+                if (continuationRequired)
+                {
+                    result = room.Game.ResolveMissedContinuation(player, pieceId);
+                }
+                else
+                {
+                    result = room.Game.FinalizeResolvedTurn();
+                }
+
+                room.ResolutionDeadlineAt = null;
+                room.ContinuationRequired = false;
+                room.PenaltyMarker = result.PenaltyMarker;
+
+                if (room.Game.IsGameOver)
+                {
+                    await UpdateStatsAfterGameAsync(room, room.Game.Players[player]);
+                    room.ReadyBySide[PlayerSide.White] = false;
+                    room.ReadyBySide[PlayerSide.Black] = false;
+                    room.DrawOfferBySide[PlayerSide.White] = false;
+                    room.DrawOfferBySide[PlayerSide.Black] = false;
+                    var resultMessage = room.Game.StatusMessage;
+                    room.Game = CreateGame(room);
+                    room.Phase = "setup";
+                    room.CountdownEndsAt = null;
+                    await BroadcastMessage(room, "toast", new { message = resultMessage });
+                }
+
+                await BroadcastSnapshot(room);
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        });
     }
 
     public IReadOnlyList<OpenRoomInfo> GetOpenRooms()
