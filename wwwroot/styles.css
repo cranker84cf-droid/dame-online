@@ -121,7 +121,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .square.light { background: var(--board-light); }
 .square.dark { background: var(--board-dark); }
 .square.penalty {
-  animation: penaltyFlash 0.25s linear 8;
+  animation: penaltyFlash 0.24s linear 8;
+  box-shadow: inset 0 0 0 999px rgba(230, 48, 48, 0.18);
 }
 .square.target::after {
   content: "";
@@ -177,8 +178,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 @keyframes penaltyFlash {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.75); }
+  0%, 100% {
+    filter: brightness(1);
+    box-shadow: inset 0 0 0 999px rgba(230, 48, 48, 0.12);
+  }
+  50% {
+    filter: brightness(1.12);
+    box-shadow: inset 0 0 0 999px rgba(255, 48, 48, 0.58);
+  }
 }
 
 @media (max-width: 900px) {

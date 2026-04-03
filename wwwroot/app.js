@@ -358,13 +358,20 @@ function maybePlayPenaltyAlert() {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
-    oscillator.type = "square";
-    oscillator.frequency.value = 880;
-    gain.gain.value = 0.02;
-    oscillator.connect(gain);
+    const filter = ctx.createBiquadFilter();
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(520, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(380, ctx.currentTime + 0.22);
+    filter.type = "lowpass";
+    filter.frequency.value = 900;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.24);
+    oscillator.connect(filter);
+    filter.connect(gain);
     gain.connect(ctx.destination);
     oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.18);
+    oscillator.stop(ctx.currentTime + 0.26);
     oscillator.onended = () => ctx.close();
   } catch {
   }

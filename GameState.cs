@@ -652,13 +652,25 @@ public sealed class GameState
             case PenaltyType.RestoreOpponentPiece:
                 return RestoreOpponentPiece(player);
             default:
-                return RemovePenaltyPiece(movedPieceId, preMoveCapturers);
+                return RemovePenaltyPiece(player, movedPieceId, preMoveCapturers);
         }
     }
 
-    private PenaltyMarker? RemovePenaltyPiece(string movedPieceId, HashSet<string> preMoveCapturers)
+    private PenaltyMarker? RemovePenaltyPiece(PlayerSide player, string movedPieceId, HashSet<string> preMoveCapturers)
     {
-        var targetId = preMoveCapturers.Contains(movedPieceId) ? movedPieceId : preMoveCapturers.FirstOrDefault();
+        var promotionRow = player == PlayerSide.White ? 0 : 9;
+        var ordered = preMoveCapturers
+            .Where(id => _pieces.ContainsKey(id))
+            .Select(id => new
+            {
+                Id = id,
+                Distance = Math.Abs(_pieces[id].Row - promotionRow)
+            })
+            .OrderBy(entry => entry.Distance)
+            .ThenBy(entry => entry.Id, StringComparer.Ordinal)
+            .ToList();
+
+        var targetId = ordered.FirstOrDefault()?.Id;
         if (targetId is not null && _pieces.Remove(targetId, out var removed))
         {
             StatusMessage = "Schlagpflicht verletzt. Ein schlagfaehiger Stein wurde entfernt.";
